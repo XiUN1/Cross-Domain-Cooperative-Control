@@ -30,12 +30,9 @@ classdef Controller
 
                 % switch when we detect a target above a threshold
             elseif obj.guidance_phase == GuidancePhase.Track
-                % "elseif" unnecessary since only other is "track", but for
-                % clarity...
+                % "elseif" unnecessary...
 
-                
-
-                % apply "triangulation" approach...
+                % apply "triangulation" approach
 
             end
 
