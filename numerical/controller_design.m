@@ -54,6 +54,5 @@ r = cos(omega * k);
 [y,t] = lsim(CLS, r, k)
 
 
-
 % stelling time = 2.6 seconds
 % overshoot = 9.79 %

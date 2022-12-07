@@ -1,4 +1,4 @@
-classdef Controller
+classdef Controller < handle
     %CONTROLLER Summary of this class goes here
     %   Detailed explanation goes here
 
@@ -20,7 +20,7 @@ classdef Controller
             end
         end
 
-        function out = get_control(obj, sample, state, system_parameters, sample_time)
+        function out = get_control(obj, sample, state, system_parameters, sample_time, laser_intensity)
             % out = matrix of size (NUM_DRONES x 3) where columns are
             % (xdot, ydot, zdot)
             out = zeros(system_parameters.num_drones, 3);
@@ -69,7 +69,7 @@ classdef Controller
                     z = drone_state_ii(5);
 
                     % desired z
-                    z_des = 15;
+                    z_des = 10; % 15
 
                     u = (u_left_vec * u_old_z(:, ii) + e_left_vec * [(z_des - z); e_old_z(:,ii)]);
                     e_old_z(:, ii) = (z_des - z);
@@ -84,7 +84,7 @@ classdef Controller
                     y = state.drones_state(ii, 3);
 
                     % omega = 3.21
-                    x_des = double(ii - 1) * 7.5 - 7.5 + (20/3 - 5/2) ( cp);
+                    x_des = double(ii - 1) * 7.5 - 7.5 + (20/3 - 5) * cos(1 * sample * sample_time);
                     y_des = 7.5 * cos(1.0 * sample * sample_time + double(ii - 1) * deg2rad(120));
 
                     u = (u_left_vec * u_old_y(:, ii) + e_left_vec * [(y_des - y); e_old_y(:,ii)]);
@@ -103,6 +103,33 @@ classdef Controller
             elseif obj.guidance_phase == GuidancePhase.Track
                 % "elseif" unnecessary since only other is "track", but for
                 % clarity...
+
+                % who is the detector who is lowest in the sky
+                detectors = [];
+                for ii = 1:system_parameters.num_drones 
+                    if laser_intensity(ii) > 2.58 * 0.0025
+                        detectors(end+1) = ii;
+                    end
+                end
+
+                if isempty(detectors)
+                    % turn into handle class?
+                    obj.guidance_phase = GuidancePhase.Search;
+                    out = obj.get_control(sample, state, system_parameters, sample_time, laser_intensity);
+                else
+                    % detectors is not empty, find the detector who is
+                    % lowest in the sky
+                    lowest_detector = detectors(1);
+                    for ii = 2:length(detectors)
+                        if state.drones_state(detectors(ii), 5) < state.drones_state(lowest_detector, 5)
+                            lowest_detector = detectors(ii);
+                        end
+                    end
+
+                    % lowest detector must hold position... cut 
+                end
+
+
 
 
 

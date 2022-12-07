@@ -3,23 +3,22 @@ function animate_entropy(states, system_parameters)
 
 f = figure; % create the figure
 ax = axes('Parent', f, 'position', [0.13 0.2 0.77 0.77]); % fix the axes dimensions
-
+x = linspace(-double(system_parameters.grid_cols) * system_parameters.grid_unit_length / 2, double(system_parameters.grid_cols) * system_parameters.grid_unit_length / 2, system_parameters.grid_cols);
+y = linspace(-double(system_parameters.grid_rows) * system_parameters.grid_unit_length / 2, double(system_parameters.grid_rows) * system_parameters.grid_unit_length / 2, system_parameters.grid_rows);
 p = states{1}.rov_probability_matrix;
 H = -(p .* log(p + 1e-16) + (1-p) .* log((1-p) + 1e-16));
-h = mesh(H); % main plot function (pretend the int32 Matrix is an image)
+h = mesh(x,y,H); % main plot function (pretend the int32 Matrix is an image)
+view(0,90)
 % clim([0 1])
 colorbar;
 
-% for ii = 1:system_parameters.num_drones
-%     [~, drones_state, ~] = states{1}.get_state;
-%     drone_state_ii = drones_state(ii,:);
-%     drone_state_ii = drone_state_ii';
-%     z = drone_state_ii(5); % vertical distance of drone "ii" above water
-%     FOV_radius = z * sin(system_parameters.drone_fov);
-%     FOV_prj_water_surface = polyshape_circle(FOV_radius, drone_state_ii(1), drone_state_ii(3), 100); % 100 seems pretty good
-%     hold on; plot(FOV_prj_water_surface);
-% end
-% hold off
+hold on;
+rov_states = states{1}.rovs_state;
+rov_x = rov_states(1);
+rov_y = rov_states(3);
+% rov_z = rov_states(5);
+scatter3(rov_x, rov_y, 5, 100, 'red', 'square', 'filled');
+hold off;
 
 % start with move number "0" representing the starting scrambled board
 sample_number = 1;
