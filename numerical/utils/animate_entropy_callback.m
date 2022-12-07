@@ -6,7 +6,7 @@ x = linspace(-double(system_parameters.grid_cols) * system_parameters.grid_unit_
 y = linspace(-double(system_parameters.grid_rows) * system_parameters.grid_unit_length / 2, double(system_parameters.grid_rows) * system_parameters.grid_unit_length / 2, system_parameters.grid_rows);
 p = states{sample_number}.rov_probability_matrix;
 H = -(p .* log(p + 1e-16) + (1-p) .* log((1-p) + 1e-16));
-h = mesh(x,y,H); % replot the exact same image as in animate_soln
+h = surf(x,y,H,'EdgeColor','none'); % replot the exact same image as in animate_soln
 view(0,90)
 % clim([0 1.0])
 colorbar;

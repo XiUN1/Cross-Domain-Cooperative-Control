@@ -33,7 +33,7 @@ classdef Controller < handle
 
             % Boilerplate for persistent variables (marginally faster than
             % using member variables and making the Controller class
-            % subclass of handle, according to ).
+            % subclass of handle, according to qualitative testing).
             persistent u_old_z e_old_z u_old_x e_old_x u_old_y e_old_y;
             if isempty(u_old_z)
                 u_old_z = zeros(1, system_parameters.num_drones);
@@ -101,8 +101,10 @@ classdef Controller < handle
                     x_des_0 = double(ii - 1) * (arena_width / double(system_parameters.num_drones)) + arena_width / double(system_parameters.num_drones) / 2 - arena_width / 2;
                     x_des_amplitude = max([arena_width / double(system_parameters.num_drones) - 2 * z * tan(system_parameters.drone_fov), 0]);
                     y_des_amplitude = max([(arena_length - 2 * z * tan(system_parameters.drone_fov)) / 2, 0]);
-                    x_des = x_des_0 + x_des_amplitude * cos(2.5 * sample * obj.sampling_time);
-                    y_des = y_des_amplitude * cos(1.0 * sample * obj.sampling_time + double(ii - 1) * deg2rad(120));
+                    T = 1.0;
+                    x_des = x_des_0 + x_des_amplitude * cos(omega_x * sample * obj.sampling_time); % 1.5
+                    T_y = 1/(2 * arena_length / (4 * z * tan(system_parameters.drone_fov)) * omega_x);
+                    y_des = y_des_amplitude * sin(omega_y * sample * obj.sampling_time + double(ii - 1) * deg2rad(120)); % 0.5
 
                     % Execute waypoint tracking for y position
                     u = (u_left_vec * u_old_y(:, ii) + e_left_vec * [(y_des - y); e_old_y(:,ii)]);

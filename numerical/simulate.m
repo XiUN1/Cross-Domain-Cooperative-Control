@@ -1,7 +1,7 @@
 addpath("utils")
 
 % Define the system parameters
-system_parameters = SystemParameters(int32(1), int32(3), 0.01, 1, deg2rad(10), int32(2), 4, deg2rad(20), 0.0025, int32(200), int32(200), 0.1);
+system_parameters = SystemParameters(int32(1), int32(1), 0.001, 1, deg2rad(10), int32(2), 4, deg2rad(20), 0.0025, int32(200), int32(200), 0.1);
 
 % Define initial condition of numerical simulation
 initial_state = State(system_parameters);
@@ -9,7 +9,7 @@ rng(10); % assign same random seed!
 initial_state = initial_state.randomize(system_parameters);
 
 % Define the time span of the numerical simulation
-t0 = 0; tfinal = 10;
+t0 = 0; tfinal = 50;
 sample_time = 0.1; % in [seconds]
 samples = t0:sample_time:tfinal;
 
@@ -29,7 +29,6 @@ for k = 1:length(samples)
     next_state.rov_probability_matrix = convoluted;
     next_state.rov_probability_matrix = next_state.rov_probability_matrix / sum(sum(next_state.rov_probability_matrix)); % renormalize
     assert(abs(sum(sum(next_state.rov_probability_matrix)) - 1.0) < 1e-12);
-%     assert(sum(sum(next_state.rov_probability_matrix)) - 1.0 < 1e-12);
 
     % Compute Intensity of each Drone (i.e. each receiver)
     % - the intensity of any given receiver is just a function of relative
@@ -73,8 +72,12 @@ for k = 1:length(samples)
         max_x_index = min([length(x)-1, max_x_index]);
         min_y_index = max([1, min_y_index]);
         max_y_index = min([length(y)-1, max_y_index]);
-        assert(min_x_index < max_x_index);
-        assert(min_y_index < max_y_index);
+        if min_x_index >= max_x_index || min_y_index >= max_y_index
+            disp("outside arena")
+            continue;
+        end
+%         assert(min_x_index < max_x_index);
+%         assert(min_y_index < max_y_index);
 
         % if the laser intensity for drone 'ii' is > threshold, then we
         % have detected an ROV
@@ -164,10 +167,30 @@ for k = 1:length(samples)
         T = sample_time;
         Q = system_parameters.rov_noise_level * [T^3/3 T^2/2 0 0 0 0; T^2/2 T 0 0 0 0; 0 0 T^3/3 T^2/2 0 0; 0 0 T^2/2 T 0 0; 0 0 0 0 T^3/3 T^2/2; 0 0 0 0 T^2/2 T];
         w = mvnrnd(zeros(6,1), Q, 1)';
-%         % idk?
-%         w(2) = max(-system_parameters.rov_max_speed, min(system_parameters.rov_max_speed, w(2)));
-%         w(4) = max(-system_parameters.rov_max_speed, min(system_parameters.rov_max_speed, w(4)));
-%         w(6) = max(-system_parameters.rov_max_speed, min(system_parameters.rov_max_speed, w(6)));
+
+        % bounds check all the position variables of the ROV, if any fall
+        % outside the "arena" then just make their corresponding velocity
+        % go inside the arena at the same magnitude as the randomly
+        % generated point... this "might" violate randomness assumptions,
+        % but I think it's fine.
+        if rov_state_ii(1) < x(1)
+            rov_state_ii(2) = abs(rov_state_ii(2));
+        end
+        if rov_state_ii(1) > x(end)
+            rov_state_ii(2) = -abs(rov_state_ii(2));
+        end
+        if rov_state_ii(3) < y(1)
+            rov_state_ii(4) = abs(rov_state_ii(4));
+        end
+        if rov_state_ii(3) > y(end)
+            rov_state_ii(4) = -abs(rov_state_ii(4));
+        end
+        if rov_state_ii(5) < -10 % arbitrary lower bound on z
+            rov_state_ii(6) = abs(rov_state_ii(6));
+        end
+        if rov_state_ii(5) > -0.1
+            rov_state_ii(6) = -abs(rov_state_ii(6));
+        end
 
         next_state_ii = A * rov_state_ii + w;
 

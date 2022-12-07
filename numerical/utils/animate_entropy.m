@@ -7,7 +7,7 @@ x = linspace(-double(system_parameters.grid_cols) * system_parameters.grid_unit_
 y = linspace(-double(system_parameters.grid_rows) * system_parameters.grid_unit_length / 2, double(system_parameters.grid_rows) * system_parameters.grid_unit_length / 2, system_parameters.grid_rows);
 p = states{1}.rov_probability_matrix;
 H = -(p .* log(p + 1e-16) + (1-p) .* log((1-p) + 1e-16));
-h = mesh(x,y,H); % main plot function (pretend the int32 Matrix is an image)
+h = surf(x,y,H,'EdgeColor','none'); % main plot function (pretend the int32 Matrix is an image)
 view(0,90)
 % clim([0 1])
 colorbar;

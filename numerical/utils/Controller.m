@@ -99,10 +99,12 @@ classdef Controller < handle
                     arena_width = double(system_parameters.grid_cols * system_parameters.grid_unit_length);
                     arena_length = double(system_parameters.grid_rows * system_parameters.grid_unit_length);
                     x_des_0 = double(ii - 1) * (arena_width / double(system_parameters.num_drones)) + arena_width / double(system_parameters.num_drones) / 2 - arena_width / 2;
-                    x_des_amplitude = max([arena_width / double(system_parameters.num_drones) - 2 * z * tan(system_parameters.drone_fov), 0]);
+                    x_des_amplitude = max([(arena_width / double(system_parameters.num_drones) - 2 * z * tan(system_parameters.drone_fov)) / 2, 0]);
                     y_des_amplitude = max([(arena_length - 2 * z * tan(system_parameters.drone_fov)) / 2, 0]);
-                    x_des = x_des_0 + x_des_amplitude * cos(2 * sample * obj.sampling_time); % 1.5
-                    y_des = y_des_amplitude * cos(0.5 * sample * obj.sampling_time + double(ii - 1) * deg2rad(120)); % 0.5
+                    omega_x = 1.5; %2.0;
+                    x_des = x_des_0 + x_des_amplitude * cos(omega_x * sample * obj.sampling_time); % 1.5
+                    omega_y = 0.15;%1/(2 * arena_length / (4 * z * tan(system_parameters.drone_fov)) * omega_x);
+                    y_des = y_des_amplitude * sin(omega_y * sample * obj.sampling_time + double(ii - 1) * deg2rad(120)); % 0.5
 
                     % Execute waypoint tracking for y position
                     u = (u_left_vec * u_old_y(:, ii) + e_left_vec * [(y_des - y); e_old_y(:,ii)]);
