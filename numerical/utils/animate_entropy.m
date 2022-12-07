@@ -1,5 +1,5 @@
 function animate_entropy(states, system_parameters)
-%ANIMATE_SOLN
+%ANIMATE_ENTROPY
 
 f = figure; % create the figure
 ax = axes('Parent', f, 'position', [0.13 0.2 0.77 0.77]); % fix the axes dimensions

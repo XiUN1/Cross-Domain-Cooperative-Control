@@ -1,11 +1,7 @@
 addpath("utils")
 
 % Define the system parameters
-% - notice: the laser detection threshold is 3 laser noise sigma values
 system_parameters = SystemParameters(int32(1), int32(3), 0.01, 1, deg2rad(10), int32(2), 4, deg2rad(20), 0.0025, int32(200), int32(200), 0.1);
-
-% Define control algorithm
-controller = Controller(system_parameters);
 
 % Define initial condition of numerical simulation
 initial_state = State(system_parameters);
@@ -16,11 +12,12 @@ initial_state = initial_state.randomize(system_parameters);
 t0 = 0; tfinal = 10;
 sample_time = 0.1; % in [seconds]
 samples = t0:sample_time:tfinal;
-% samples = linspace(t0, tfinal, (tfinal - t0) / sample_time);
 
-states = {initial_state};
+% Define control algorithm
+controller = Controller(sample_time, EstimationStrategy.GradientAscent);
 
 % Discrete-Time simulation...
+states = {initial_state};
 for k = 1:length(samples)
     current_state = states{k};
     next_state = State(system_parameters);
@@ -29,14 +26,10 @@ for k = 1:length(samples)
     filter_radius = ceil(system_parameters.rov_max_speed / system_parameters.grid_unit_length); % yeah
     conv_filter = fspecial('disk', filter_radius);
     convoluted = conv2(current_state.rov_probability_matrix, conv_filter, 'same');
-%     med = median(median(convoluted));
-%     convoluted(1:filter_radius, :) = med * ones(size(convoluted(1:filter_radius,:)));
-%     convoluted(end-9:end, :) = med * ones(size(convoluted(end-9:end,:)));
-%     convoluted(:, 1:filter_radius) = med * ones(size(convoluted(:, 1:filter_radius)));
-%     convoluted(:, end-9:end) = med * ones(size(convoluted(:, end-9:end)));
-%     convoluted = convoluted / sum(sum(convoluted));
     next_state.rov_probability_matrix = convoluted;
-    assert(sum(sum(next_state.rov_probability_matrix)) - 1.0 < 1e-12);
+    next_state.rov_probability_matrix = next_state.rov_probability_matrix / sum(sum(next_state.rov_probability_matrix)); % renormalize
+    assert(abs(sum(sum(next_state.rov_probability_matrix)) - 1.0) < 1e-12);
+%     assert(sum(sum(next_state.rov_probability_matrix)) - 1.0 < 1e-12);
 
     % Compute Intensity of each Drone (i.e. each receiver)
     % - the intensity of any given receiver is just a function of relative
@@ -104,7 +97,7 @@ for k = 1:length(samples)
                     intersection = intersect(grid_jk, FOV_prj_water_surface);
                     assert(intersection.NumRegions == 0 || intersection.NumRegions == 1);
                     if intersection.NumRegions == 1
-                        all_intersected_area = union(all_intersected_area);
+                        all_intersected_area = union(all_intersected_area, intersection);
                         area_ratio = area(intersection) / area(FOV_prj_water_surface);
 
                         % what this means is, if area_ratio = 0.0042, for 
@@ -144,8 +137,6 @@ for k = 1:length(samples)
                     end
                 end
             end
-
-            % how much to increment the probability by:
         end
     end
 
@@ -160,6 +151,7 @@ for k = 1:length(samples)
         end
         assert(sum(sum(next_state.rov_probability_matrix)) - 1.0 < 1e-12);
     end
+    
 
     % Update ROV state for next sample time (shouldn't touch anymore)
     for ii = 1:system_parameters.num_rovs
@@ -184,7 +176,7 @@ for k = 1:length(samples)
     end
 
     % Update drone state for next sample time (shouldn't touch anymore)
-    u = controller.get_control(k, current_state, system_parameters, sample_time, next_state.laser_intensity);
+    u = controller.get_control(k, current_state, system_parameters, next_state.laser_intensity);
     for ii = 1:system_parameters.num_drones
         [~, drones_state, ~] = current_state.get_state;
         drone_state_ii = drones_state(ii,:);
@@ -205,10 +197,12 @@ for k = 1:length(samples)
     disp(k / length(samples) * 100 + "% Done");
 end
 
-
+% Plot the result
 plot_rov_data(samples(1:length(states)-1), {states{2:end}}, 1);
 plot_drone_data(samples(1:length(states)-1), {states{2:end}}, 2);
 plot_laser_intensity_data(samples(1:length(states)-1), {states{2:end}}, 3);
 animate_entropy({states{2:length(states)}}, system_parameters)
+
+
 
 

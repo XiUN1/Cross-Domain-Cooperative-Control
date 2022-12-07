@@ -1,14 +1,20 @@
 classdef Controller < handle
-    %CONTROLLER Summary of this class goes here
-    %   Detailed explanation goes here
+    %CONTROLLER this class stores the controller parameters and keeps a
+    %record of the current controller states; crucially, the member
+    %function "get_control(...)" will return the control signal given the
+    %controller states as well as the system state.
 
     properties
-        guidance_phase  % search track or track phase
+        guidance_phase  % search phase or track phase?
+        estimation_strategy  % what estimation strategy should we take?
+        sampling_time  % in seconds
     end
 
     methods
-        function obj = Controller(system_parameters)
+        function obj = Controller(sampling_time, estimation_strategy)
             obj.guidance_phase = GuidancePhase.Search;
+            obj.estimation_strategy = estimation_strategy;
+            obj.sampling_time = sampling_time;
         end
 
         function control = constrain_control(obj, control, params)
@@ -20,10 +26,14 @@ classdef Controller < handle
             end
         end
 
-        function out = get_control(obj, sample, state, system_parameters, sample_time, laser_intensity)
+        function out = get_control(obj, sample, state, system_parameters, laser_intensity)
             % out = matrix of size (NUM_DRONES x 3) where columns are
             % (xdot, ydot, zdot)
             out = zeros(system_parameters.num_drones, 3);
+
+            % Boilerplate for persistent variables (marginally faster than
+            % using member variables and making the Controller class
+            % subclass of handle, according to qualitative testing).
             persistent u_old_z e_old_z u_old_x e_old_x u_old_y e_old_y;
             if isempty(u_old_z)
                 u_old_z = zeros(1, system_parameters.num_drones);
@@ -50,62 +60,68 @@ classdef Controller < handle
             end
 
             if obj.guidance_phase == GuidancePhase.Search
-                % apply the entropy based search approach here...
-
-                % recall we are applying a control input to "num_drones"
-                % number of drones. So we may need a for-loop or
-                % something...
+                % Subdivide the arena into "num_dronnes" equally sized 
+                % chunks. Have each drone conduct a lawnmower search over 
+                % their respective chunk at the max height possible.
                 [~, drones_state, ~] = state.get_state();
-                T = sample_time;
+                T = obj.sampling_time;
                 
-                % Compute z-direction control
+                % Compute z-axis position control
                 u_left_vec = -[0.506449719108587];
                 e_left_vec = [95.871889860291304 -89.515570805993178];
                 for ii = 1:system_parameters.num_drones
-                    drone_state_ii = drones_state(ii, :);
-                    drone_state_ii = drone_state_ii';
+                    % for each drone, grab the drone's current 'z' position
+                    z = drones_state(ii, 5);
 
-                    % z position
-                    z = drone_state_ii(5);
+                    % drone "ii"s desired z position
+                    z_des = 10; % for now this is fixed... modify later
 
-                    % desired z
-                    z_des = 10; % 15
-
+                    % apply pure discrete-time control law
                     u = (u_left_vec * u_old_z(:, ii) + e_left_vec * [(z_des - z); e_old_z(:,ii)]);
                     e_old_z(:, ii) = (z_des - z);
                     u_old_z(:, ii) = u;
                     out(ii, 3) = u;
                 end
 
-                % Use potential-field to guide to areas of high-entropy
+                % Compute xy-plane position control
                 for ii = 1:system_parameters.num_drones
-                    %
+                    % for each drone, grab the drone's current 'x', 'y',
+                    % and 'z' positions
                     x = state.drones_state(ii, 1);
                     y = state.drones_state(ii, 3);
+                    z = state.drones_state(ii, 5);
 
-                    % omega = 3.21
-                    x_des = double(ii - 1) * 7.5 - 7.5 + (20/3 - 5) * cos(1 * sample * sample_time);
-                    y_des = 7.5 * cos(1.0 * sample * sample_time + double(ii - 1) * deg2rad(120));
+                    % Compute the desired reference trajectory
+                    % (parameterized by 'k') as a function of the arena
+                    % size and drone FOV (possibly as well as other system
+                    % parameters like laser intensity clutter, laser
+                    % intensity Gaussian noise, expected depth of ROVs etc)
+                    arena_width = double(system_parameters.grid_cols * system_parameters.grid_unit_length);
+                    arena_length = double(system_parameters.grid_rows * system_parameters.grid_unit_length);
+                    x_des_0 = double(ii - 1) * (arena_width / double(system_parameters.num_drones)) + arena_width / double(system_parameters.num_drones) / 2 - arena_width / 2;
+                    x_des_amplitude = max([arena_width / double(system_parameters.num_drones) - 2 * z * tan(system_parameters.drone_fov), 0]);
+                    y_des_amplitude = max([(arena_length - 2 * z * tan(system_parameters.drone_fov)) / 2, 0]);
+                    x_des = x_des_0 + x_des_amplitude * cos(2 * sample * obj.sampling_time); % 1.5
+                    y_des = y_des_amplitude * cos(0.5 * sample * obj.sampling_time + double(ii - 1) * deg2rad(120)); % 0.5
 
+                    % Execute waypoint tracking for y position
                     u = (u_left_vec * u_old_y(:, ii) + e_left_vec * [(y_des - y); e_old_y(:,ii)]);
                     e_old_y(:, ii) = (y_des - y);
                     u_old_y(:, ii) = u;
                     out(ii, 2) = u;
 
+                    % Execute waypoint tracking for x position
                     u = (u_left_vec * u_old_x(:, ii) + e_left_vec * [(x_des - x); e_old_x(:,ii)]);
                     e_old_x(:, ii) = (x_des - x);
                     u_old_x(:, ii) = u;
                     out(ii, 1) = u;
-                    % we want to go here [mir(mic), mic]
-                end                
-
-                % switch when we detect a target above a threshold
+                end
             elseif obj.guidance_phase == GuidancePhase.Track
-                % "elseif" unnecessary since only other is "track", but for
-                % clarity...
-                disp("tracking on")
+                % if we are in track mode, then turn start estimating the
+                % state
 
-                % who is the detector who is lowest in the sky
+                % determine the index of the drone(s) currently "seeing"
+                % the laser signal
                 detectors = [];
                 for ii = 1:system_parameters.num_drones 
                     if laser_intensity(ii) > 2.58 * 0.0025
@@ -114,85 +130,26 @@ classdef Controller < handle
                 end
 
                 if isempty(detectors)
-                    % turn into handle class?
+                    % if the controller was in "track" phase upon entering
+                    % this function, but we are not detecting anything,
+                    % then switch to search phase and get the control from
+                    % that.
+                    disp("tracking off") % just for debugging purposes
                     obj.guidance_phase = GuidancePhase.Search;
-                    out = obj.get_control(sample, state, system_parameters, sample_time, laser_intensity);
+                    out = obj.get_control(sample, state, system_parameters, laser_intensity);
                 else
-                    % detectors is not empty, find the detector who is
-                    % lowest in the sky
-                    lowest_detector = detectors(1);
-                    for ii = 2:length(detectors)
-                        if state.drones_state(detectors(ii), 5) < state.drones_state(lowest_detector, 5)
-                            lowest_detector = detectors(ii);
-                        end
-                    end
+                    % if the controller is in "track" phase, and we can
+                    % still "see" the ROV, then initiate tracking guidance
+                    % sequence.
 
-                    disp("lowest detector " + lowest_detector);
-
-                    % lowest detector must hold position...
-
-                    out(:, lowest_detector) = -[state.drones_state(lowest_detector, 2:2:6)]';
-
-                    % other drones must fly to 1/2 the height and go to
-
-                    [~, drones_state, ~] = state.get_state();
-                    T = sample_time;
-                    
-                    % Compute z-direction control
-                    u_left_vec = -[0.506449719108587];
-                    e_left_vec = [95.871889860291304 -89.515570805993178];
-                    for ii = 1:system_parameters.num_drones
-                        if ii == lowest_detector
-                            continue;
-                        end
-                        drone_state_ii = drones_state(ii, :);
-                        drone_state_ii = drone_state_ii';
-    
-                        % z position
-                        z = drone_state_ii(5);
-    
-                        % desired z
-                        z_des = state.drones_state(lowest_detector, 5) / 2; % half height of other lowest
-    
-                        u = (u_left_vec * u_old_z(:, ii) + e_left_vec * [(z_des - z); e_old_z(:,ii)]);
-                        e_old_z(:, ii) = (z_des - z);
-                        u_old_z(:, ii) = u;
-                        out(ii, 3) = u;
-                    end
-    
-                    % Use potential-field to guide to areas of high-entropy
-                    for ii = 1:system_parameters.num_drones
-                        %
-                        if ii == lowest_detector
-                            continue;
-                        end
-                        x = state.drones_state(ii, 1);
-                        y = state.drones_state(ii, 3);
-    
-                        % omega = 3.21
-                        x_des = state.drones_state(lowest_detector, 1) + state.drones_state(lowest_detector, 5) / 2 * tan(system_parameters.drone_fov) * cos(3.1 * sample_time * sample + double(ii - 1) * deg2rad(120));
-                        y_des = state.drones_state(lowest_detector, 3) + state.drones_state(lowest_detector, 5) / 2 * tan(system_parameters.drone_fov) * sin(3.1 * sample_time * sample + double(ii - 1) * deg2rad(120));
-    
-                        u = (u_left_vec * u_old_y(:, ii) + e_left_vec * [(y_des - y); e_old_y(:,ii)]);
-                        e_old_y(:, ii) = (y_des - y);
-                        u_old_y(:, ii) = u;
-                        out(ii, 2) = u;
-    
-                        u = (u_left_vec * u_old_x(:, ii) + e_left_vec * [(x_des - x); e_old_x(:,ii)]);
-                        e_old_x(:, ii) = (x_des - x);
-                        u_old_x(:, ii) = u;
-                        out(ii, 1) = u;
-                        % we want to go here [mir(mic), mic]
-                    end
+                    obj.guidance_phase = GuidancePhase.Search;
+                    out = obj.get_control(sample, state, system_parameters, laser_intensity);
+                    obj.guidance_phase = GuidancePhase.Track;
                 end
-
-
-
-
-
-                % apply "triangulation" approach...
-
             end
+
+            % saturate the control effort used by each drone if the control
+            % signals exceed the bound
             out = obj.constrain_control(out, system_parameters);
         end
     end
