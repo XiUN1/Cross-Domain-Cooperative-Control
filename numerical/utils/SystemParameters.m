@@ -7,21 +7,30 @@ classdef SystemParameters
     %   2. All ROV lasers have the same modeling parameters
 
     properties
-        num_rovs % integer
-        num_drones % integer
+        num_rovs  % integer
+        num_drones  % integer
+
+        % ROV noise level
+        rov_noise_level  % double
+        rov_max_speed  % double
 
         % laser receiver parameters
-        drone_fov % (radians) assume that FOV is same for all drones
+        drone_fov  % (radians) assume that FOV is same for all drones
  
         % laser model parameters
-        beam_order % beam order (integer). "n" in equations for intensity of beam
-        laser_power % laser's rated power (Watts). "P" in equations for intensity of beam
-        laser_divergence % laser's divergence (radians). "Theta" in equations for the intensity of beam
+        beam_order  % beam order (integer). "n" in equations for intensity of beam
+        laser_power  % laser's rated power (Watts). "P" in equations for intensity of beam
+        laser_divergence  % laser's divergence (radians). "Theta" in equations for the intensity of beam
+        laser_noise_std  % assume Gaussian distribution to noise
+
+        % probability grid parameters
+        grid_cols  % integer
+        grid_rows  % integer
+        grid_unit_length  % (double) how long is a side of each grid square (in meters)?
     end
 
     methods
-        function obj = SystemParameters(num_rovs, num_drones, drone_fov, beam_order, laser_power, laser_divergence)
-            
+        function obj = SystemParameters(num_rovs, num_drones, rov_noise_level, rov_max_speed, drone_fov, beam_order, laser_power, laser_divergence, laser_noise_std, grid_cols, grid_rows, grid_unit_length)
             assert(num_rovs >= 1); % there must be at least one ROV
             assert(isinteger(num_rovs)); % must be integer (cannot be float)
             obj.num_rovs = num_rovs;
@@ -29,6 +38,14 @@ classdef SystemParameters
             assert(num_drones >= 1); % there must be at least one drone
             assert(isinteger(num_drones)); % must be an integer (cannot be float)
             obj.num_drones = num_drones;
+
+            assert(rov_noise_level > 0);
+            assert(isa(rov_noise_level, 'double'));
+            obj.rov_noise_level = rov_noise_level;
+
+            assert(rov_max_speed > 0);
+            assert(isa(rov_max_speed, 'double'));
+            obj.rov_max_speed = rov_max_speed;
 
             assert(drone_fov > 0 && drone_fov < pi); % 0 < FOV < pi (in radians)
             assert(isa(drone_fov, 'double')); % make sure "drone_fov" is 'double'
@@ -46,7 +63,21 @@ classdef SystemParameters
             assert(isa(laser_divergence, 'double')); % make sure "laser_divergence" is 'double'
             obj.laser_divergence = laser_divergence;
 
+            assert(laser_noise_std > 0);
+            assert(isa(laser_noise_std, 'double'));
+            obj.laser_noise_std = laser_noise_std;
 
+            assert(grid_cols > 0);
+            assert(isinteger(grid_cols));
+            obj.grid_cols = grid_cols;
+
+            assert(grid_rows > 0);
+            assert(isinteger(grid_rows));
+            obj.grid_rows = grid_rows;
+
+            assert(grid_unit_length > 0);
+            assert(isa(grid_unit_length, 'double'));
+            obj.grid_unit_length = grid_unit_length;
         end
     end
 end

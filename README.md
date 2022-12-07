@@ -5,6 +5,8 @@ What capabilities do I want to show Linda, Derek, and Professor Paley? What perf
 
 1. I want to show that we can search an area cooperatively using the Entropy-based approach that Animesh used. How do we show this? We have a simulation of an environment w/ or w/out ROV(s) but with at least 2 UAVs which search an area in the same manner as is done in the Python simulations. What metrics do I want to show? Maybe total entropy? What is some analysis we could pull in?
 - we want to state assumptions. we want to show the impact of changing different parameters. we maybe want to do some performance limitations (what is the minimum entropy achievable? What does that mean physically (like what is the most we can confidently know about the environment given the number of drones and ROVs we have in an area.)
+	1a.) Start simpler. Let's just have 1 drone perform the search. figure out how the search actually works, then increase the number of drones to 2 then arbitrarily large. 
+	1b.) For performance metrics ideas, go to stonesoup and see what they measure. Maybe ask Prof Paley or Animesh.
 
 
 2. I want to show that we can detect a target. How do we show that? We must show searching first, then once we start to read laser intensity high enough, we assume that that must come from a target, and we track switch to the "track" phase.

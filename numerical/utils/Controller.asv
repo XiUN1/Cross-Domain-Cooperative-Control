@@ -7,7 +7,7 @@ classdef Controller
     end
 
     methods
-        function obj = Controller()
+        function obj = Controller(system_parameters)
             obj.guidance_phase = GuidancePhase.Search;
         end
 
@@ -15,28 +15,101 @@ classdef Controller
             for ii = 1:params.num_drones
                 if norm(control(ii, :)) > 1
                     % if the norm of the desired control is > 1, normalize each row
-                    control(ii,:) = control(ii,:) / norm(control(ii,:));
+                    control(ii, :) = control(ii,:) / norm(control(ii,:));
                 end
             end
         end
 
-        function out = get_control(obj, state, params)
+        function out = get_control(obj, sample, state, system_parameters, sample_time)
             % out = matrix of size (NUM_DRONES x 3) where columns are
             % (xdot, ydot, zdot)
-            out = zeros(params.num_drones, 3);
+            out = zeros(system_parameters.num_drones, 3);
+            persistent u_old_z e_old_z u_old_x e_old_x u_old_y e_old_y;
+            if isempty(u_old_z)
+                u_old_z = zeros(1, system_parameters.num_drones);
+            end
+
+            if isempty(e_old_z)
+                e_old_z = zeros(1, system_parameters.num_drones);
+            end
+
+            if isempty(u_old_x)
+                u_old_x = zeros(1, system_parameters.num_drones);
+            end
+
+            if isempty(e_old_x)
+                e_old_x = zeros(1, system_parameters.num_drones);
+            end
+
+            if isempty(u_old_y)
+                u_old_y = zeros(1, system_parameters.num_drones);
+            end
+
+            if isempty(e_old_y)
+                e_old_y = zeros(1, system_parameters.num_drones);
+            end
 
             if obj.guidance_phase == GuidancePhase.Search
                 % apply the entropy based search approach here...
 
+                % recall we are applying a control input to "num_drones"
+                % number of drones. So we may need a for-loop or
+                % something...
+                [~, drones_state, ~] = state.get_state();
+                T = sample_time;
+                
+                % Compute z-direction control
+                u_left_vec = -[0.506449719108587];
+                e_left_vec = [95.871889860291304 -89.515570805993178];
+                for ii = 1:system_parameters.num_drones
+                    drone_state_ii = drones_state(ii, :);
+                    drone_state_ii = drone_state_ii';
+
+                    % z position
+                    z = drone_state_ii(5);
+
+                    % desired z
+                    z_des = 15;
+
+                    u = (u_left_vec * u_old_z(:, ii) + e_left_vec * [(z_des - z); e_old_z(:,ii)]);
+                    e_old_z(:, ii) = (z_des - z);
+                    u_old_z(:, ii) = u;
+                    out(ii, 3) = u;
+                end
+
+                % Use potential-field to guide to areas of high-entropy
+                for ii = 1:system_parameters.num_drones
+                    %
+                    x = state.drones_state(ii, 1);
+                    y = state.drones_state(ii, 3);
+
+                    % omega = 3.21
+                    x_des = double(ii - 1) * 7.5 - 7.5 + (20/3 - 5/2) ( cp);
+                    y_des = 7.5 * cos(1.0 * sample * sample_time + double(ii - 1) * deg2rad(120));
+
+                    u = (u_left_vec * u_old_y(:, ii) + e_left_vec * [(y_des - y); e_old_y(:,ii)]);
+                    e_old_y(:, ii) = (y_des - y);
+                    u_old_y(:, ii) = u;
+                    out(ii, 2) = u;
+
+                    u = (u_left_vec * u_old_x(:, ii) + e_left_vec * [(x_des - x); e_old_x(:,ii)]);
+                    e_old_x(:, ii) = (x_des - x);
+                    u_old_x(:, ii) = u;
+                    out(ii, 1) = u;
+                    % we want to go here [mir(mic), mic]
+                end                
+
                 % switch when we detect a target above a threshold
             elseif obj.guidance_phase == GuidancePhase.Track
-                % "elseif" unnecessary...
+                % "elseif" unnecessary since only other is "track", but for
+                % clarity...
 
-                % apply "triangulation" approach
+
+
+                % apply "triangulation" approach...
 
             end
-
-            out = obj.constrain_control(out, params);
+            out = obj.constrain_control(out, system_parameters);
         end
     end
 end
