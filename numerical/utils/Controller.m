@@ -101,7 +101,7 @@ classdef Controller < handle
                     x_des_0 = double(ii - 1) * (arena_width / double(system_parameters.num_drones)) + arena_width / double(system_parameters.num_drones) / 2 - arena_width / 2;
                     x_des_amplitude = max([(arena_width / double(system_parameters.num_drones) - 2 * z * tan(system_parameters.drone_fov)) / 2, 0]);
                     y_des_amplitude = max([(arena_length - 2 * z * tan(system_parameters.drone_fov)) / 2, 0]);
-                    omega_x = 1.5; %2.0;
+                    omega_x = 1.0; %2.0 ... one drone = 1.5
                     x_des = x_des_0 + x_des_amplitude * cos(omega_x * sample * obj.sampling_time); % 1.5
                     omega_y = 0.15;%1/(2 * arena_length / (4 * z * tan(system_parameters.drone_fov)) * omega_x);
                     y_des = y_des_amplitude * sin(omega_y * sample * obj.sampling_time + double(ii - 1) * deg2rad(120)); % 0.5
@@ -153,6 +153,9 @@ classdef Controller < handle
             % saturate the control effort used by each drone if the control
             % signals exceed the bound
             out = obj.constrain_control(out, system_parameters);
+%             u_old_x = out(:,1)';
+%             u_old_y = out(:,2)';
+%             u_old_z = out(:,3)';
         end
     end
 end
