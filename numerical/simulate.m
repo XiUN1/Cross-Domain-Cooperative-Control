@@ -14,7 +14,7 @@ sample_time = 0.1; % in [seconds]
 samples = t0:sample_time:tfinal;
 
 % Define control algorithm
-controller = Controller(sample_time, EstimationStrategy.GradientAscent);
+controller = Controller(sample_time);
 
 % Discrete-Time simulation...
 states = {initial_state};

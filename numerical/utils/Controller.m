@@ -6,14 +6,12 @@ classdef Controller < handle
 
     properties
         guidance_phase  % search phase or track phase?
-        estimation_strategy  % what estimation strategy should we take?
         sampling_time  % in seconds
     end
 
     methods
-        function obj = Controller(sampling_time, estimation_strategy)
+        function obj = Controller(sampling_time)
             obj.guidance_phase = GuidancePhase.Search;
-            obj.estimation_strategy = estimation_strategy;
             obj.sampling_time = sampling_time;
         end
 
@@ -153,9 +151,6 @@ classdef Controller < handle
             % saturate the control effort used by each drone if the control
             % signals exceed the bound
             out = obj.constrain_control(out, system_parameters);
-%             u_old_x = out(:,1)';
-%             u_old_y = out(:,2)';
-%             u_old_z = out(:,3)';
         end
     end
 end
